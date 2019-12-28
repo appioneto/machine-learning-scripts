@@ -1,0 +1,409 @@
+
+########%%%%%%%%%%%% start loading modules %%%%%%%%%%%%########
+import pandas
+import numpy
+#from pandas.plotting import scatter_matrix
+import matplotlib.pyplot as plt
+from sklearn import model_selection
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from numpy import array
+from numpy import argmax
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+from numpy import savetxt
+from numpy import concatenate
+from sklearn.externals import joblib
+########%%%%%%%%%%%% finish loading modules %%%%%%%%%%%%########
+
+
+
+
+########%%%%%%%%%%%%     load dataset       %%%%%%%%%%%%########
+#Importa a base
+url ="C:/Users/appio/Documents/Python/ATIV_OUT2017_DEZ2017.txt"
+tim = pandas.read_csv(url, encoding = "ISO-8859-1", sep='|')
+########%%%%%%%%%%%%     load dataset       %%%%%%%%%%%%########
+
+
+
+
+
+########%%%%%%%%%%%%      label encoder     %%%%%%%%%%%%########
+#check columns with null values
+tim.isnull().sum()
+
+
+#corrigir coluna plano que tem valores nulos
+tim['PLANO2']=tim['PLANO'].fillna(method='ffill')
+
+
+# Label encoder PLANO
+label_encoder = LabelEncoder()
+integer_encoded = label_encoder.fit_transform(tim['PLANO2'])
+print(integer_encoded)
+tim['PLANO_LE']=integer_encoded
+
+
+#Label encoder PDV
+label_encoder = LabelEncoder()
+integer_encoded = label_encoder.fit_transform(tim['PDV'])
+print(integer_encoded)
+tim['PDV_LE']=integer_encoded
+
+#create a new dataframe numbers only values
+tim1=tim[['DDD', 'DIA_ATIV', 'HORA_ATIV', 'FLAG_FIDEL', 'PLANO_LE', 'PDV_LE', 'FLAG_FRAUDE']]
+
+########%%%%%%%%%%%%      label encoder     %%%%%%%%%%%%########
+
+#separando um mes para validar o modelo
+tim_train=tim1[(tim.MES_ANO<=112017)]
+tim_unseen=tim1[(tim.MES_ANO>112017)]
+
+
+#criando um dataset com 5% de fraude para treinar melhor o modelo para identificar fraude
+
+fraude=tim_train[(tim_train.FLAG_FRAUDE==1)]
+tim_a=tim_train[(tim_train.FLAG_FRAUDE==0)].sample(112000, replace=True)
+tim2=tim_a.append(fraude)
+
+#criando os datasets unseen
+array1=tim_unseen.values
+X1 = array1[:,0:6]
+Y1 = array1[:,6]
+
+
+########%%%%%%%%%%%%      explore data      %%%%%%%%%%%%########
+tim1.head()
+tim1.shape
+tim1.dtypes
+tim1.describe()
+
+#check balance on response variable
+balance=tim1.groupby('FLAG_FRAUDE').size()
+print(balance)
+
+#correlation between attributes
+pandas.set_option('display.width', 100)
+pandas.set_option('precision', 3)
+correlations = tim1.corr(method='pearson')
+print(correlations)
+
+
+#Skew of Univariate Distributions
+skew = tim1.skew()
+print(skew)
+
+
+#visualize histogram. Alguns algoritmos assumem uma distribuição gaussiana (bell curve)
+tim1.hist()
+plt.show()
+
+
+#Density Plots
+tim1.plot(kind='density', subplots=True, layout=(3,3), sharex=False)
+plt.show()
+
+
+#Box and Whisker Plots
+tim1.plot(kind='box', subplots=True, layout=(3,3), sharex=False, sharey=False)
+plt.show()
+
+
+#Correlation Matrix Plot
+correlations = tim1.corr()
+# plot correlation matrix
+fig = plt.figure()
+ax = fig.add_subplot(111)
+cax = ax.matshow(correlations, vmin=-1, vmax=1)
+fig.colorbar(cax)
+ticks = numpy.arange(0,9,1)
+ax.set_xticks(ticks)
+ax.set_yticks(ticks)
+ax.set_xticklabels(names)
+ax.set_yticklabels(names)
+plt.show()
+
+#Scatterplot Matrix
+scatter_matrix(tim1)
+plt.show()
+########%%%%%%%%%%%%      explore data      %%%%%%%%%%%%########
+
+
+
+########%%%%%%%%%%%%   Feature engeeniring  %%%%%%%%%%%%########
+##Feature engeeniring
+#Univariate Selection
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import chi2
+test = SelectKBest(score_func=chi2, k=4)
+fit = test.fit(X, Y)
+# summarize scores
+numpy.set_printoptions(precision=3)
+print(fit.scores_)
+features = fit.transform(X)
+# summarize selected features
+print(features[0:5,:])
+
+
+#Recursive Feature Elimination
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+# feature extraction
+model = LogisticRegression()
+rfe = RFE(model, 3)
+fit = rfe.fit(X, Y)
+#print("Num Features: %d") % fit.n_features_
+print("Selected Features: %s") % fit.support_
+print("Feature Ranking: %s") % fit.ranking_
+
+
+
+#Feature Importance
+from sklearn.ensemble import ExtraTreesClassifier
+# feature extraction
+model = ExtraTreesClassifier()
+model.fit(X, Y)
+print(model.feature_importances_)
+########%%%%%%%%%%%%   Feature engeeniring  %%%%%%%%%%%%########
+
+
+
+
+
+########%%%%%%%%%%%%     pre processing     %%%%%%%%%%%%########
+array = tim2.values
+
+#RESCALE DATA - Normalization process into the range between 0 and 1
+#best for regression and neural networks and algorithms that use distance measures like K-Nearest Neighbors.
+
+# separate array into input and output components
+from sklearn.preprocessing import MinMaxScaler
+X = array[:,0:6]
+Y = array[:,6]
+scaler = MinMaxScaler(feature_range=(0, 1))
+rescaledX = scaler.fit_transform(X)
+# summarize transformed data
+numpy.set_printoptions(precision=3)
+print(rescaledX[0:5,:])
+X=rescaledX
+
+
+##STANDARDIZE DATA - transform attributes with a Gaussian distribution and differing means and standard deviations to a standard Gaussian distribution with a mean of 0 ##and a standard deviation of 1.
+#work better with rescaled data, such as linear regression, logistic regression and linear discriminate analysis.
+
+
+from sklearn.preprocessing import StandardScaler
+X = array[:,0:6]
+Y = array[:,6]
+scaler = StandardScaler().fit(X1)
+rescaledX = scaler.transform(X1)
+# summarize transformed data
+numpy.set_printoptions(precision=3)
+print(rescaledX[0:5,:])
+X1=rescaledX
+
+
+##NORMALIZE DATA - useful for sparse datasets (lots of zeros) with attributes of varying scales
+##best for neural networks and algorithms that use distance measures such as K-Nearest Neighbors.
+
+from sklearn.preprocessing import Normalizer
+X = array[:,0:6]
+Y = array[:,6]
+scaler = Normalizer().fit(X)
+normalizedX = scaler.transform(X)
+# summarize transformed data
+numpy.set_printoptions(precision=3)
+print(normalizedX[0:5,:])
+########%%%%%%%%%%%%     pre processing     %%%%%%%%%%%%########
+
+
+
+X = array[:,0:6]
+Y = array[:,6]
+
+
+# Split-out validation dataset
+validation_size = 0.20
+seed = 7
+X_train, X_validation, Y_train, Y_validation = model_selection.train_test_split(X, Y, test_size=validation_size, random_state=seed)
+# Test options and evaluation metric
+seed = 7
+scoring = 'accuracy'
+Y_train = Y_train.astype(int).ravel()
+Y_validation=Y_validation.ravel()
+
+
+# Spot Check Algorithms
+models = []
+models.append(('LR', LogisticRegression()))
+models.append(('LDA', LinearDiscriminantAnalysis()))
+models.append(('KNN', KNeighborsClassifier()))
+#models.append(('CART', DecisionTreeClassifier()))
+#models.append(('NB', GaussianNB()))
+#models.append(('SVM', SVC())) #this model don't run. Looping forever.
+
+
+
+# evaluate each model in turn
+results = []
+names = []
+for name, model in models:
+	kfold = model_selection.KFold(n_splits=10, random_state=seed)
+	cv_results = model_selection.cross_val_score(model, X_train, Y_train, cv=kfold, scoring=scoring)
+	results.append(cv_results)
+	names.append(name)
+	msg = "%s: %f (%f)" % (name, cv_results.mean(), cv_results.std())
+	print(msg)
+	
+
+
+	
+
+
+
+lr = LogisticRegression()
+lr.fit(X_train, Y_train)
+predictions = lr.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+
+lda = LinearDiscriminantAnalysis()
+lda.fit(X_train, Y_train)
+predictions = lda.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+
+knn = KNeighborsClassifier()
+knn.fit(X_train, Y_train)
+predictions = knn.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+
+#aplicando sobre o dataset unseen
+knn = KNeighborsClassifier()
+knn.fit(X_train, Y_train)
+predictions = knn.predict(X1)
+Y1=Y1.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y1, predictions))
+print(confusion_matrix(Y1, predictions))
+print(classification_report(Y1, predictions))
+
+
+
+
+dtc = DecisionTreeClassifier()
+dtc.fit(X_train, Y_train)
+predictions = dtc.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+#aplicando sobre o dataset unseen
+dtc = DecisionTreeClassifier()
+dtc.fit(X_train, Y_train)
+predictions = dtc.predict(X1)
+Y1=Y1.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y1, predictions))
+print(confusion_matrix(Y1, predictions))
+print(classification_report(Y1, predictions))
+
+
+
+
+
+nb = GaussianNB()
+nb.fit(X_train, Y_train)
+predictions = nb.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+	
+	
+	
+
+
+
+
+svm = SVC()
+svm.fit(X_train, Y_train)
+predictions = svm.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+#Saving selected model and deploy over other dataset
+
+# save the model to disk
+filename = 'C:/Users/appio/Documents/Python/knn31122018_model.sav'
+joblib.dump(model, filename)
+
+
+# load the model from disk
+loaded_model = joblib.load(filename)
+result = loaded_model.score(X_train, Y_train)
+print(result)
+
+
+
+# export to txt
+np.savetxt('C:/Users/f8031638/Documents/python/X_validation.txt', X_validation, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/Y_validation.txt', Y_validation, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/X_train.txt', X_train, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/Y_train.txt', Y_train, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/predictions.txt', predictions, delimiter='|', fmt='%4d')
+
+# export to txt outro formato
+savetxt('C:/Users/f8031638/Documents/python/X_validation.txt', X_validation, delimiter='|', fmt='%s')
+savetxt('C:/Users/f8031638/Documents/python/X_train.txt', X_train, delimiter='|', fmt='%s')
+
+
+
+url = "C:/Users/f8031638/Documents/python/X_validation.txt"
+X_validation = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/X_train.txt"
+X_train = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/Y_validation.txt"
+Y_validation = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/Y_train.txt"
+Y_train = pandas.read_csv(url, sep='|')

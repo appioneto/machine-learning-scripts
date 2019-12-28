@@ -1,0 +1,219 @@
+import pandas
+#from pandas.plotting import scatter_matrix
+#import matplotlib.pyplot as plt
+from sklearn import model_selection
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from numpy import array
+from numpy import argmax
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+from numpy import savetxt
+from numpy import concatenate
+#from sklearn.externals import joblib
+
+
+#Importa a base
+url ="C:/Users/appio/Documents/Python/ATIV_DEZ2017.txt"
+dez = pandas.read_csv(url, encoding = "ISO-8859-1", sep='|')
+
+array = dez.values
+
+
+
+#one hot encoded PLANO
+dplano_a=array[:,3:4]
+dplano_a=dplano_a.ravel()
+label_encoder = LabelEncoder()
+integer_encoded = label_encoder.fit_transform(dplano_a)
+print(integer_encoded)
+onehot_encoder = OneHotEncoder(sparse=False)
+integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
+dplano_a_e = onehot_encoder.fit_transform(integer_encoded)
+print(dplano_a_e)
+
+
+#one hot encoded LOGIN
+dlogin_a=array[:,4:5]
+dlogin_a=dlogin_a.ravel()
+label_encoder = LabelEncoder()
+integer_encoded = label_encoder.fit_transform(dlogin_a)
+print(integer_encoded)
+onehot_encoder = OneHotEncoder(sparse=False)
+integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
+dlogin_a_e = onehot_encoder.fit_transform(integer_encoded)
+print(dlogin_a_e)
+
+
+
+#one hot encoded DDD
+dddd_a=array[:,1:2]
+dddd_a=dddd_a.ravel()
+label_encoder = LabelEncoder()
+integer_encoded = label_encoder.fit_transform(dddd_a)
+print(integer_encoded)
+onehot_encoder = OneHotEncoder(sparse=False)
+integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
+dddd_a_e = onehot_encoder.fit_transform(integer_encoded)
+print(dddd_a_e)
+
+
+
+# Split-out validation dataset
+dX = array[:,6:10]
+dY = array[:,10:11]
+dXX=concatenate((dX, dplano_a_e, dlogin_a_e, dddd_a_e), axis=1)
+validation_size = 0.20
+seed = 7
+X_train, X_validation, Y_train, Y_validation = model_selection.train_test_split(dXX, dY, test_size=validation_size, random_state=seed)
+# Test options and evaluation metric
+seed = 7
+scoring = 'accuracy'
+Y_train = Y_train.astype(int)
+
+
+
+# Spot Check Algorithms
+models = []
+models.append(('LR', LogisticRegression()))
+models.append(('LDA', LinearDiscriminantAnalysis()))
+models.append(('KNN', KNeighborsClassifier()))
+models.append(('CART', DecisionTreeClassifier()))
+models.append(('NB', GaussianNB()))
+
+
+
+# evaluate each model in turn
+results = []
+names = []
+for name, model in models:
+	kfold = model_selection.KFold(n_splits=10, random_state=seed)
+	cv_results = model_selection.cross_val_score(model, X_train, Y_train, cv=kfold, scoring=scoring)
+	results.append(cv_results)
+	names.append(name)
+	msg = "%s: %f (%f)" % (name, cv_results.mean(), cv_results.std())
+	print(msg)
+	
+
+
+
+
+
+lr = LogisticRegression()
+lr.fit(X_train, Y_train)
+predictions = lr.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+#66%
+
+
+lda = LinearDiscriminantAnalysis()
+lda.fit(X_train, Y_train)
+predictions = lda.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+#44%
+
+
+knn = KNeighborsClassifier()
+knn.fit(X_train, Y_train)
+predictions = knn.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+#58%
+
+
+dtc = DecisionTreeClassifier()
+dtc.fit(X_train, Y_train)
+predictions = dtc.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+#39%
+
+
+
+
+nb = GaussianNB()
+nb.fit(X_train, Y_train)
+predictions = nb.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+	
+	
+	
+#11%
+
+
+
+svm = SVC()
+svm.fit(X_train, Y_train)
+predictions = svm.predict(X_validation)
+Y_validation=Y_validation.astype(int)
+predictions=predictions.astype(int)
+print(accuracy_score(Y_validation, predictions))
+print(confusion_matrix(Y_validation, predictions))
+print(classification_report(Y_validation, predictions))
+
+
+
+
+# save the model to disk
+filename = 'C:/Users/f8031638/Documents/python/finalized_model.sav'
+joblib.dump(model, filename)
+
+
+
+
+
+
+# export to txt
+np.savetxt('C:/Users/f8031638/Documents/python/X_validation.txt', X_validation, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/Y_validation.txt', Y_validation, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/X_train.txt', X_train, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/Y_train.txt', Y_train, delimiter='|', fmt='%4d')
+np.savetxt('C:/Users/f8031638/Documents/python/predictions.txt', predictions, delimiter='|', fmt='%4d')
+
+# export to txt outro formato
+savetxt('C:/Users/f8031638/Documents/python/X_validation.txt', X_validation, delimiter='|', fmt='%s')
+savetxt('C:/Users/f8031638/Documents/python/X_train.txt', X_train, delimiter='|', fmt='%s')
+
+
+
+url = "C:/Users/f8031638/Documents/python/X_validation.txt"
+X_validation = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/X_train.txt"
+X_train = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/Y_validation.txt"
+Y_validation = pandas.read_csv(url, sep='|')
+
+url = "C:/Users/f8031638/Documents/python/Y_train.txt"
+Y_train = pandas.read_csv(url, sep='|')
